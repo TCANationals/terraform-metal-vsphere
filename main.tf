@@ -83,6 +83,14 @@ resource "equinix_metal_vlan" "public_vlans" {
   description = jsonencode(element(var.public_subnets.*.name, count.index))
 }
 
+# Setup gateway for public IPs to pass traffic
+resource "equinix_metal_gateway" "public_vlans" {
+  count             = length(var.public_subnets)
+  project_id        = local.project_id
+  vlan_id           = element(equinix_metal_vlan.public_vlans.*.id, count.index)
+  ip_reservation_id = element(equinix_metal_reserved_ip_block.ip_blocks.*.id, count.index)
+}
+
 resource "equinix_metal_device" "router" {
   depends_on              = [equinix_metal_ssh_key.ssh_pub_key]
   hostname                = var.router_hostname
