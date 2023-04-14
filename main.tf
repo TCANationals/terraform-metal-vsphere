@@ -120,12 +120,12 @@ resource "equinix_metal_port" "router" {
   reset_on_delete = true
 }
 
-resource "equinix_metal_ip_attachment" "block_assignment" {
-  depends_on    = [equinix_metal_port.router]
-  count         = length(equinix_metal_reserved_ip_block.ip_blocks)
-  device_id     = equinix_metal_device.router.id
-  cidr_notation = element(equinix_metal_reserved_ip_block.ip_blocks.*.cidr_notation, count.index)
-}
+# resource "equinix_metal_ip_attachment" "block_assignment" {
+#   depends_on    = [equinix_metal_port.router]
+#   count         = length(equinix_metal_reserved_ip_block.ip_blocks)
+#   device_id     = equinix_metal_device.router.id
+#   cidr_notation = element(equinix_metal_reserved_ip_block.ip_blocks.*.cidr_notation, count.index)
+# }
 
 resource "equinix_metal_device" "esxi_hosts" {
   depends_on              = [equinix_metal_ssh_key.ssh_pub_key]

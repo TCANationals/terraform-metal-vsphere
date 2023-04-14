@@ -13,6 +13,10 @@ echo "Enabling swap"
 esxcli sched swap system set --datastore-enabled true
 esxcli sched swap system set --datastore-name datastore1
 
+# Make sure we have a DNS server configured
+esxcli network ip dns server add --server=8.8.8.8
+esxcli network ip dns server add --server=8.8.4.4
+
 # Update to your specified version of ESXi in the variables.tf file
 vim-cmd /hostsvc/maintenance_mode_enter || true
 
