@@ -72,8 +72,8 @@ context.check_hostname = False
 context.verify_mode = ssl.CERT_NONE
 
 
-si = connect.SmartConnectNoSSL(
-    host=vcenter_fqdn, user=vcenter_username, pwd=sso_password, port=443
+si = connect.SmartConnect(
+    host=vcenter_fqdn, user=vcenter_username, pwd=sso_password, port=443, disableSslCertValidation=True
 )
 cluster = getClusterInstance(vcenter_cluster_name, si)
 vcMos = vsanapiutils.GetVsanVcMos(si._stub, context=context)

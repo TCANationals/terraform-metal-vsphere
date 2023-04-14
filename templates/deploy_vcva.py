@@ -93,8 +93,8 @@ os.system(
 si = None
 for i in range(1, 30):
     try:
-        si = connect.SmartConnectNoSSL(
-            host=vcenter_ip, user=vcenter_username, pwd=sso_password, port=443
+        si = connect.SmartConnect(
+            host=vcenter_ip, user=vcenter_username, pwd=sso_password, port=443, disableSslCertValidation=True
         )
         break
     except Exception:
