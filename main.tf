@@ -14,16 +14,16 @@ locals {
   gcs_key_path = coalesce(abspath(var.path_to_gcs_key), path.module, var.relative_path_to_gcs_key, local.gcs_keys_cwd[0])
 }
 
-resource "metal_project" "new_project" {
+resource "equinix_metal_project" "new_project" {
   count           = var.create_project ? 1 : 0
   name            = var.project_name
   organization_id = var.organization_id
 }
 
 locals {
-  depends_on = [metal_project.new_project]
+  depends_on = [equinix_metal_project.new_project]
   count      = var.create_project ? 1 : 0
-  project_id = var.create_project ? metal_project.new_project[0].id : var.project_id
+  project_id = var.create_project ? equinix_metal_project.new_project[0].id : var.project_id
 }
 
 resource "tls_private_key" "ssh_key_pair" {
@@ -31,8 +31,8 @@ resource "tls_private_key" "ssh_key_pair" {
   rsa_bits  = 4096
 }
 
-resource "metal_ssh_key" "ssh_pub_key" {
-  depends_on = [metal_project.new_project]
+resource "equinix_metal_ssh_key" "ssh_pub_key" {
+  depends_on = [equinix_metal_project.new_project]
   name       = local.ssh_key_name
   public_key = chomp(tls_private_key.ssh_key_pair.public_key_openssh)
 }
@@ -47,11 +47,11 @@ resource "local_file" "project_private_key_pem" {
   }
 }
 
-data "metal_facility" "facility" {
-  code = metal_device.router.deployed_facility
+data "equinix_metal_facility" "facility" {
+  code = equinix_metal_device.router.deployed_facility
 }
 
-resource "metal_reserved_ip_block" "ip_blocks" {
+resource "equinix_metal_reserved_ip_block" "ip_blocks" {
   count      = length(var.public_subnets)
   project_id = local.project_id
   facility   = var.facility == "" ? null : var.facility
@@ -59,7 +59,7 @@ resource "metal_reserved_ip_block" "ip_blocks" {
   quantity   = element(var.public_subnets.*.ip_count, count.index)
 }
 
-resource "metal_reserved_ip_block" "esx_ip_blocks" {
+resource "equinix_metal_reserved_ip_block" "esx_ip_blocks" {
   count      = var.esxi_host_count
   project_id = local.project_id
   facility   = var.facility == "" ? null : var.facility
@@ -67,7 +67,7 @@ resource "metal_reserved_ip_block" "esx_ip_blocks" {
   quantity   = 8
 }
 
-resource "metal_vlan" "private_vlans" {
+resource "equinix_metal_vlan" "private_vlans" {
   count       = length(var.private_subnets)
   facility    = var.facility == "" ? null : var.facility
   metro       = var.metro == "" ? null : var.metro
@@ -75,7 +75,7 @@ resource "metal_vlan" "private_vlans" {
   description = jsonencode(element(var.private_subnets.*.name, count.index))
 }
 
-resource "metal_vlan" "public_vlans" {
+resource "equinix_metal_vlan" "public_vlans" {
   count       = length(var.public_subnets)
   facility    = var.facility == "" ? null : var.facility
   metro       = var.metro == "" ? null : var.metro
@@ -83,8 +83,8 @@ resource "metal_vlan" "public_vlans" {
   description = jsonencode(element(var.public_subnets.*.name, count.index))
 }
 
-resource "metal_device" "router" {
-  depends_on              = [metal_ssh_key.ssh_pub_key]
+resource "equinix_metal_device" "router" {
+  depends_on              = [equinix_metal_ssh_key.ssh_pub_key]
   hostname                = var.router_hostname
   plan                    = var.router_size
   facilities              = var.facility == "" ? null : [var.facility]
@@ -96,13 +96,13 @@ resource "metal_device" "router" {
 }
 
 locals {
-  hybrid_bonded_router = contains(data.metal_facility.facility.features, "ibx") ? true : false
+  hybrid_bonded_router = contains(data.equinix_metal_facility.facility.features, "ibx") ? true : false
 }
 
-resource "metal_port" "router" {
+resource "equinix_metal_port" "router" {
   bonded   = local.hybrid_bonded_router
-  port_id  = [for p in metal_device.router.ports : p.id if p.name == (local.hybrid_bonded_router ? "bond0" : "eth1")][0]
-  vlan_ids = concat(metal_vlan.private_vlans.*.id, metal_vlan.public_vlans.*.id)
+  port_id  = [for p in equinix_metal_device.router.ports : p.id if p.name == (local.hybrid_bonded_router ? "bond0" : "eth1")][0]
+  vlan_ids = concat(equinix_metal_vlan.private_vlans.*.id, equinix_metal_vlan.public_vlans.*.id)
 
   # vlans can't delete when ports are connected to them.
   # if the device is deleted without disconnecting first,
@@ -112,15 +112,15 @@ resource "metal_port" "router" {
   reset_on_delete = true
 }
 
-resource "metal_ip_attachment" "block_assignment" {
-  depends_on    = [metal_port.router]
-  count         = length(metal_reserved_ip_block.ip_blocks)
-  device_id     = metal_device.router.id
-  cidr_notation = element(metal_reserved_ip_block.ip_blocks.*.cidr_notation, count.index)
+resource "equinix_metal_ip_attachment" "block_assignment" {
+  depends_on    = [equinix_metal_port.router]
+  count         = length(equinix_metal_reserved_ip_block.ip_blocks)
+  device_id     = equinix_metal_device.router.id
+  cidr_notation = element(equinix_metal_reserved_ip_block.ip_blocks.*.cidr_notation, count.index)
 }
 
-resource "metal_device" "esxi_hosts" {
-  depends_on              = [metal_ssh_key.ssh_pub_key]
+resource "equinix_metal_device" "esxi_hosts" {
+  depends_on              = [equinix_metal_ssh_key.ssh_pub_key]
   count                   = var.esxi_host_count
   hostname                = format("%s%02d", var.esxi_hostname, count.index + 1)
   plan                    = var.esxi_size
@@ -133,7 +133,7 @@ resource "metal_device" "esxi_hosts" {
   ip_address {
     type            = "public_ipv4"
     cidr            = 29
-    reservation_ids = [element(metal_reserved_ip_block.esx_ip_blocks.*.id, count.index)]
+    reservation_ids = [element(equinix_metal_reserved_ip_block.esx_ip_blocks.*.id, count.index)]
   }
   ip_address {
     type = "private_ipv4"
@@ -144,7 +144,7 @@ resource "metal_device" "esxi_hosts" {
 }
 
 resource "null_resource" "reboot_pre_upgrade" {
-  depends_on = [metal_device.esxi_hosts]
+  depends_on = [equinix_metal_device.esxi_hosts]
   count      = var.update_esxi ? 1 : 0
 
   provisioner "local-exec" {
@@ -154,7 +154,7 @@ resource "null_resource" "reboot_pre_upgrade" {
 
 data "template_file" "upgrade_script" {
   count    = var.update_esxi ? 1 : 0
-  template = "${file("${path.module}/templates/update_esxi.sh.tpl")}"
+  template = file("${path.module}/templates/update_esxi.sh.tpl")
   vars = {
     esxi_update_filename = "${var.esxi_update_filename}"
   }
@@ -163,17 +163,17 @@ data "template_file" "upgrade_script" {
 # Run the ESXi update script file in each server.
 # If you make changes to the shell script, you need to update the sed command line number to get rid of te { at the end of the file which gets created by Terraform for some reason.
 resource "null_resource" "upgrade_nodes" {
-  depends_on  = [null_resource.reboot_pre_upgrade]
-  count       = var.update_esxi ? length(metal_device.esxi_hosts) : 0
+  depends_on = [null_resource.reboot_pre_upgrade]
+  count      = var.update_esxi ? length(equinix_metal_device.esxi_hosts) : 0
 
   connection {
     user        = local.ssh_user
     private_key = chomp(tls_private_key.ssh_key_pair.private_key_pem)
-    host        = "${element(metal_device.esxi_hosts.*.access_public_ipv4, count.index)}"
+    host        = element(equinix_metal_device.esxi_hosts.*.access_public_ipv4, count.index)
   }
 
   provisioner "file" {
-    content     = "${data.template_file.upgrade_script.0.rendered}"
+    content     = data.template_file.upgrade_script.0.rendered
     destination = "/tmp/update_esxi.sh"
   }
 
@@ -196,12 +196,12 @@ resource "null_resource" "reboot_post_upgrade" {
   }
 }
 
-resource "metal_port" "esxi_hosts" {
-  depends_on  = [null_resource.reboot_post_upgrade]
-  count       = length(metal_device.esxi_hosts)
-  bonded      = false
-  port_id     = [for p in metal_device.esxi_hosts[count.index].ports : p.id if p.name == "eth1"][0]
-  vlan_ids    = concat(metal_vlan.private_vlans.*.id, metal_vlan.public_vlans.*.id)
+resource "equinix_metal_port" "esxi_hosts" {
+  depends_on = [null_resource.reboot_post_upgrade]
+  count      = length(equinix_metal_device.esxi_hosts)
+  bonded     = false
+  port_id    = [for p in equinix_metal_device.esxi_hosts[count.index].ports : p.id if p.name == "eth1"][0]
+  vlan_ids   = concat(equinix_metal_vlan.private_vlans.*.id, equinix_metal_vlan.public_vlans.*.id)
 
   reset_on_delete = true
 
@@ -212,13 +212,13 @@ resource "metal_port" "esxi_hosts" {
 }
 
 data "template_file" "vars_file" {
-  template = "${file("${path.module}/templates/vars.py")}"
+  template = file("${path.module}/templates/vars.py")
   vars = {
     private_subnets      = jsonencode(var.private_subnets),
-    private_vlans        = jsonencode(metal_vlan.private_vlans.*.vxlan),
+    private_vlans        = jsonencode(equinix_metal_vlan.private_vlans.*.vxlan),
     public_subnets       = jsonencode(var.public_subnets),
-    public_vlans         = jsonencode(metal_vlan.public_vlans.*.vxlan),
-    public_cidrs         = jsonencode(metal_reserved_ip_block.ip_blocks.*.cidr_notation),
+    public_vlans         = jsonencode(equinix_metal_vlan.public_vlans.*.vxlan),
+    public_cidrs         = jsonencode(equinix_metal_reserved_ip_block.ip_blocks.*.cidr_notation),
     domain_name          = var.domain_name,
     vcenter_network      = var.vcenter_portgroup_name,
     vcenter_fqdn         = format("vcva.%s", var.domain_name),
@@ -227,7 +227,7 @@ data "template_file" "vars_file" {
     sso_password         = random_password.sso_password.result,
     vcenter_cluster_name = var.vcenter_cluster_name,
     plan_type            = var.esxi_size,
-    esx_passwords        = jsonencode(metal_device.esxi_hosts.*.root_password),
+    esx_passwords        = jsonencode(equinix_metal_device.esxi_hosts.*.root_password),
     dc_name              = var.vcenter_datacenter_name,
     metal_token          = var.auth_token,
   }
@@ -238,7 +238,7 @@ resource "null_resource" "run_pre_reqs" {
     type        = "ssh"
     user        = local.ssh_user
     private_key = chomp(tls_private_key.ssh_key_pair.private_key_pem)
-    host        = metal_device.router.access_public_ipv4
+    host        = equinix_metal_device.router.access_public_ipv4
   }
 
   provisioner "remote-exec" {
@@ -246,7 +246,7 @@ resource "null_resource" "run_pre_reqs" {
   }
 
   provisioner "file" {
-    content = "${data.template_file.vars_file.rendered}"
+    content     = data.template_file.vars_file.rendered
     destination = "bootstrap/vars.py"
   }
 
@@ -281,7 +281,7 @@ resource "null_resource" "copy_gcs_key" {
     type        = "ssh"
     user        = local.ssh_user
     private_key = chomp(tls_private_key.ssh_key_pair.private_key_pem)
-    host        = metal_device.router.access_public_ipv4
+    host        = equinix_metal_device.router.access_public_ipv4
   }
   provisioner "file" {
     content     = file(local.gcs_key_path)
@@ -298,7 +298,7 @@ resource "null_resource" "download_vcenter_iso" {
     type        = "ssh"
     user        = local.ssh_user
     private_key = chomp(tls_private_key.ssh_key_pair.private_key_pem)
-    host        = metal_device.router.access_public_ipv4
+    host        = equinix_metal_device.router.access_public_ipv4
   }
 
   provisioner "file" {
@@ -350,7 +350,7 @@ resource "null_resource" "install_vpn_server" {
     type        = "ssh"
     user        = local.ssh_user
     private_key = chomp(tls_private_key.ssh_key_pair.private_key_pem)
-    host        = metal_device.router.access_public_ipv4
+    host        = equinix_metal_device.router.access_public_ipv4
   }
 
   provisioner "file" {
@@ -392,18 +392,18 @@ resource "null_resource" "copy_vcva_template" {
     type        = "ssh"
     user        = local.ssh_user
     private_key = chomp(tls_private_key.ssh_key_pair.private_key_pem)
-    host        = metal_device.router.access_public_ipv4
+    host        = equinix_metal_device.router.access_public_ipv4
   }
 
   provisioner "file" {
     content = templatefile("${path.module}/templates/vcva_template.json", {
-      vcenter_password        = random_password.vcenter_password.result,
-      sso_password            = random_password.sso_password.result,
-      first_esx_pass          = metal_device.esxi_hosts.0.root_password,
-      domain_name             = var.domain_name,
-      vcenter_network         = var.vcenter_portgroup_name,
-      vcenter_domain          = var.vcenter_domain,
-      vcva_deployment_option  = var.vcva_deployment_option
+      vcenter_password       = random_password.vcenter_password.result,
+      sso_password           = random_password.sso_password.result,
+      first_esx_pass         = equinix_metal_device.esxi_hosts.0.root_password,
+      domain_name            = var.domain_name,
+      vcenter_network        = var.vcenter_portgroup_name,
+      vcenter_domain         = var.vcenter_domain,
+      vcva_deployment_option = var.vcva_deployment_option
     })
 
     destination = "bootstrap/vcva_template.json"
@@ -416,7 +416,7 @@ resource "null_resource" "copy_update_uplinks" {
     type        = "ssh"
     user        = local.ssh_user
     private_key = chomp(tls_private_key.ssh_key_pair.private_key_pem)
-    host        = metal_device.router.access_public_ipv4
+    host        = equinix_metal_device.router.access_public_ipv4
   }
 
   provisioner "file" {
@@ -431,7 +431,7 @@ resource "null_resource" "esx_network_prereqs" {
     type        = "ssh"
     user        = local.ssh_user
     private_key = chomp(tls_private_key.ssh_key_pair.private_key_pem)
-    host        = metal_device.router.access_public_ipv4
+    host        = equinix_metal_device.router.access_public_ipv4
   }
 
   provisioner "file" {
@@ -441,7 +441,7 @@ resource "null_resource" "esx_network_prereqs" {
 }
 
 resource "null_resource" "apply_esx_network_config" {
-  count = length(metal_device.esxi_hosts)
+  count = length(equinix_metal_device.esxi_hosts)
   depends_on = [
     null_resource.reboot_post_upgrade,
     null_resource.esx_network_prereqs,
@@ -453,11 +453,11 @@ resource "null_resource" "apply_esx_network_config" {
     type        = "ssh"
     user        = local.ssh_user
     private_key = chomp(tls_private_key.ssh_key_pair.private_key_pem)
-    host        = metal_device.router.access_public_ipv4
+    host        = equinix_metal_device.router.access_public_ipv4
   }
 
   provisioner "remote-exec" {
-    inline = ["python3 $HOME/bootstrap/esx_host_networking.py --host '${element(metal_device.esxi_hosts.*.access_public_ipv4, count.index)}' --user root --pass '${element(metal_device.esxi_hosts.*.root_password, count.index)}' --id '${element(metal_device.esxi_hosts.*.id, count.index)}' --index ${count.index} --ipRes ${element(metal_reserved_ip_block.esx_ip_blocks.*.id, count.index)}"]
+    inline = ["python3 $HOME/bootstrap/esx_host_networking.py --host '${element(equinix_metal_device.esxi_hosts.*.access_public_ipv4, count.index)}' --user root --pass '${element(equinix_metal_device.esxi_hosts.*.root_password, count.index)}' --id '${element(equinix_metal_device.esxi_hosts.*.id, count.index)}' --index ${count.index} --ipRes ${element(equinix_metal_reserved_ip_block.esx_ip_blocks.*.id, count.index)}"]
   }
 }
 
@@ -470,7 +470,7 @@ resource "null_resource" "deploy_vcva" {
     type        = "ssh"
     user        = local.ssh_user
     private_key = chomp(tls_private_key.ssh_key_pair.private_key_pem)
-    host        = metal_device.router.access_public_ipv4
+    host        = equinix_metal_device.router.access_public_ipv4
   }
 
   provisioner "file" {
@@ -500,7 +500,7 @@ resource "null_resource" "vsan_claim" {
     type        = "ssh"
     user        = local.ssh_user
     private_key = chomp(tls_private_key.ssh_key_pair.private_key_pem)
-    host        = metal_device.router.access_public_ipv4
+    host        = equinix_metal_device.router.access_public_ipv4
   }
 
   provisioner "remote-exec" {
@@ -519,7 +519,7 @@ data "external" "get_vcenter_ip" {
   query = {
     "private_subnets" = jsonencode(var.private_subnets)
     "public_subnets"  = jsonencode(var.public_subnets)
-    "public_cidrs"    = jsonencode(metal_reserved_ip_block.ip_blocks.*.cidr_notation)
+    "public_cidrs"    = jsonencode(equinix_metal_reserved_ip_block.ip_blocks.*.cidr_notation)
     "vcenter_network" = var.vcenter_portgroup_name
   }
 }

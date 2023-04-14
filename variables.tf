@@ -203,7 +203,7 @@ variable "vcenter_user_name" {
 variable "s3_url" {
   description = "This is the URL endpoint to connect your s3 client to"
   type        = string
-  default     = "https://s3.example.com"
+  default     = "https://s3.amazonaws.com"
 }
 
 variable "s3_access_key" {
@@ -235,7 +235,7 @@ variable "object_store_tool" {
 variable "object_store_bucket_name" {
   description = "This is the name of the bucket on your Object Store"
   type        = string
-  default     = "vmware"
+  default     = "tcanationals-infra-files"
 }
 
 variable "gcs_key_name" {

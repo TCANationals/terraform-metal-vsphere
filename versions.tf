@@ -1,12 +1,10 @@
 terraform {
-  experiments = [module_variable_optional_attrs]
   required_providers {
     null = {
       source = "hashicorp/null"
     }
-    metal = {
-      source  = "equinix/metal"
-      version = "3.3.0"
+    equinix = {
+      source = "equinix/equinix"
     }
     random = {
       source = "hashicorp/random"
