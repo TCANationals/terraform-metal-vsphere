@@ -1,10 +1,11 @@
-# VMware on Equinix Metal
+# TCA Contest on Equinix Metal (VMware)
 
-[![Experimental](https://img.shields.io/badge/Stability-Experimental-red.svg)](https://github.com/packethost/standards#about-uniform-standards)
-[![Slack Status](https://slack.equinixmetal.com/badge.svg)](https://slack.equinixmetal.com/)
-[![integration](https://github.com/equinix/terraform-metal-vsphere/actions/workflows/integration.yml/badge.svg)](https://github.com/equinix/terraform-metal-vsphere/actions/workflows/integration.yml)
+This repo deploys the TCA contest on Equinix Metal.
 
-This repo has Terraform plans to deploy a multi-node vSphere cluster with vSan enabled on Equinix Metal. Follow this simple instructions below and you should be able to go from zero to vSphere in 30 minutes.
+This script will take many hours to run. Each section averages:
+
+* Initial Host Deployment - 45 minutes
+* VMware vCenter Deployment - 10 minutes
 
 ## Install Terraform
 

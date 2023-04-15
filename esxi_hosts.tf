@@ -23,7 +23,7 @@ resource "equinix_metal_device" "esxi_hosts" {
 # Have to sleep after ESXi hosts are provisioned, since they reboot the host at end of provisioning
 resource "time_sleep" "reboot_post_creation" {
   depends_on      = [equinix_metal_device.esxi_hosts]
-  create_duration = "250s"
+  create_duration = "300s"
 }
 
 data "template_file" "upgrade_script" {
