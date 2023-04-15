@@ -39,22 +39,11 @@ We need an object store to download *closed source* packages such as *vCenter* a
 
 The following settings will be needed in your `terraform.tfvars` to use S3
 ```console
-object_store_tool        = "mc"
 object_store_bucket_name = "bucket_name/folder"
 s3_url                   = "https://s3.example.com"
 s3_access_key            = "4fa85962-975f-4650-b603-17f1cb9dee10"
 s3_secret_key            = "becf3868-3f07-4dbb-a6d5-eacfd7512b09"
 s3_version               = "S3v4"
-```
-
-### Google Cloud Storage (GCS)
-We also have the optoin to use Google Cloud Storage (GCS). The setup will use a service account with Storage Reader permissions to download the needed files.
-
-The following settings will be needed in your `terraform.tfvars` to use GCS
-```console
-object_store_tool        = "gcs"
-object_store_bucket_name = "bucket_name/folder"
-relative_path_to_gcs_key = "storage-reader-key.json"
 ```
 
 ## Upload files to your Object Store

@@ -10,18 +10,6 @@ variable "organization_id" {
   default     = "null"
 }
 
-variable "project_name" {
-  default     = "vmware-on-metal-1"
-  type        = string
-  description = "If 'create_project' is true this will be the project name used."
-}
-
-variable "create_project" {
-  description = "if true create the Equinix Metal project, if not skip and use the provided project"
-  type        = bool
-  default     = true
-}
-
 variable "project_id" {
   description = "Equinix Metal Project ID to use in case create_project is false"
   type        = string
@@ -89,7 +77,7 @@ variable "public_subnets" {
   }))
   default = [
     {
-      "name" : "VM Public Net 1",
+      "name" : "Internet",
       "nat" : false,
       "vsphere_service_type" : null,
       "routable" : true,
@@ -98,20 +86,14 @@ variable "public_subnets" {
   ]
 }
 
-variable "router_hostname" {
-  description = "This is the hostname for the router."
-  type        = string
-  default     = "edge-gateway01"
-}
-
 variable "esxi_hostname" {
   description = "This is the hostname prefix for your esxi hosts. A number will be added to the end."
   type        = string
   default     = "esx"
 }
 
-variable "router_size" {
-  description = "This is the size/plan/flavor of your router machine"
+variable "bastion_size" {
+  description = "This is the size/plan/flavor of your bastion machine"
   type        = string
   default     = "c3.small.x86"
 }
@@ -134,8 +116,8 @@ variable "metro" {
   default     = ""
 }
 
-variable "router_os" {
-  description = "This is the operating System for you router machine (Only Ubuntu 18.04 has been tested)"
+variable "bastion_os" {
+  description = "This is the operating System for the bastion machine (Only Ubuntu 18.04 has been tested)"
   type        = string
   default     = "ubuntu_18_04"
 }
@@ -226,34 +208,10 @@ variable "s3_version" {
   default     = "S3v4"
 }
 
-variable "object_store_tool" {
-  description = "Which tool should you use to download objects from the object store? ('mc' and 'gcs' have been tested.)"
-  type        = string
-  default     = "mc"
-}
-
 variable "object_store_bucket_name" {
   description = "This is the name of the bucket on your Object Store"
   type        = string
   default     = "tcanationals-infra-files"
-}
-
-variable "gcs_key_name" {
-  description = "If you are using GCS to download your vCenter ISO this is the name of the GCS key"
-  type        = string
-  default     = "storage-reader-key.json"
-}
-
-variable "path_to_gcs_key" {
-  description = "If you are using GCS to download your vCenter ISO this is the absolute path to the GCS key (ex: /home/example/storage-reader-key.json)"
-  type        = string
-  default     = ""
-}
-
-variable "relative_path_to_gcs_key" {
-  description = "(Deprecated: use path_to_gcs_key) If you are using GCS to download your vCenter ISO this is the path to the GCS key"
-  type        = string
-  default     = ""
 }
 
 variable "vcenter_iso_name" {
