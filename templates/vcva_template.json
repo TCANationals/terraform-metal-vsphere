@@ -6,7 +6,18 @@
       "username": "root",
       "password": "${first_esx_pass}",
       "deployment_network": "${vcenter_network}",
-      "datastore": "datastore1"
+      "VCSA_cluster": {
+        "datacenter": "${datacenter_name}",
+        "cluster": "Cluster",
+        "compression_only": false,
+        "deduplication_and_compression": false,
+        "disks_for_vsan": {
+          "cache_disk": [],
+          "capacity_disk": []
+        },
+        "enable_vlcm": false,
+        "enable_vsan_esa": false
+      }
     },
     "appliance": {
       "thin_disk_mode": true,
@@ -18,7 +29,8 @@
       "mode": "static",
       "ip": "__VCENTER_IP__",
       "dns_servers": [
-        "__VCENTER_GATEWAY__"
+        "8.8.8.8",
+        "8.8.4.4"
       ],
       "prefix": "__VCENTER_PREFIX_LENGTH__",
       "gateway": "__VCENTER_GATEWAY__",
@@ -27,7 +39,7 @@
     "os": {
       "password": "${vcenter_password}",
       "ntp_servers": "129.6.15.27, 132.163.96.2, 132.163.97.3",
-      "ssh_enable": true
+      "ssh_enable": false
     },
     "sso": {
       "password": "${sso_password}",

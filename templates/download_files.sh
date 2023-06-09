@@ -30,12 +30,17 @@ mc config host add s3 ${s3_url} ${s3_access_key} ${s3_secret_key}
 mc cp s3/${object_store_bucket_name}/en-us_sql_server_2019_enterprise_x64_dvd_46f0ba38.iso .
 mc cp s3/${object_store_bucket_name}/en-us_windows_10_enterprise_ltsc_2021_x64_dvd_d289cf96.iso .
 mc cp s3/${object_store_bucket_name}/SW_DVD9_Win_Server_STD_CORE_2022_64Bit_English_DC_STD_MLF_X22-74290.iso .
+mc cp s3/${object_store_bucket_name}/FreeBSD-13.2-RELEASE-amd64-disc1.iso .
+mc cp s3/${object_store_bucket_name}/ubuntu-22.04.1-live-server-amd64.iso .
 
 # Download vmware tools ISO
 mc cp s3/${object_store_bucket_name}/VMware-tools-windows-12.2.0-21223074.iso .
 
 # Download vCenter ISO
 mc cp s3/${object_store_bucket_name}/${vcenter_iso_name} .
+
+# Download OVAs
+mc cp s3/${object_store_bucket_name}/euc-unified-access-gateway-23.03.0.0-21401666_OVF10.ova .
 
 # Download other tools
 mc cp s3/${object_store_bucket_name}/vsanapiutils.py .

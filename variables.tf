@@ -47,7 +47,7 @@ variable "private_subnets" {
       "vsphere_service_type" : "management",
       "routable" : true,
       "cidr" : "172.16.0.0/24",
-      "reserved_ip_count" : 100
+      "reserved_ip_count" : 30
     },
     {
       "name" : "vMotion",
@@ -66,24 +66,22 @@ variable "private_subnets" {
   ]
 }
 
-variable "public_subnets" {
+variable "public_subnet" {
   description = "This will dynamically create public subnets in vSphere"
-  type = list(object({
+  type = object({
     name                 = string,
     nat                  = bool,
     vsphere_service_type = optional(string),
     routable             = bool,
     ip_count             = number
-  }))
-  default = [
-    {
-      "name" : "Internet",
-      "nat" : false,
-      "vsphere_service_type" : null,
-      "routable" : true,
-      "ip_count" : 8
-    }
-  ]
+  })
+  default = {
+    "name" : "Internet",
+    "nat" : false,
+    "vsphere_service_type" : null,
+    "routable" : true,
+    "ip_count" : 8
+  }
 }
 
 variable "esxi_hostname" {
@@ -119,7 +117,7 @@ variable "metro" {
 variable "bastion_os" {
   description = "This is the operating System for the bastion machine (Only Ubuntu 18.04 has been tested)"
   type        = string
-  default     = "ubuntu_18_04"
+  default     = "ubuntu_22_04"
 }
 
 variable "vmware_os" {
@@ -143,7 +141,7 @@ variable "esxi_host_count" {
 variable "vcenter_portgroup_name" {
   description = "This is the VM Portgroup you would like vCenter to be deployed to. See 'private_subnets' & 'public_subnets' above. By deploying on a public subnet, you will not need to use the VPN to access vCenter."
   type        = string
-  default     = "VM Public Net 1"
+  default     = "Internet"
 }
 
 variable "domain_name" {
@@ -217,6 +215,7 @@ variable "object_store_bucket_name" {
 variable "vcenter_iso_name" {
   description = "The name of the vCenter ISO in your Object Store"
   type        = string
+  default     = "VMware-VCSA-all-8.0.1-21815093.iso"
 }
 
 variable "reservations" {

@@ -29,3 +29,8 @@
 #   value       = lookup(data.external.get_vcenter_ip.result, "vcenter_ip")
 #   description = "The IP address of vCenter"
 # }
+
+output "bastion_ip" {
+  value       = equinix_metal_device.bastion.access_public_ipv4
+  description = "The IP address of the Bastion host"
+}

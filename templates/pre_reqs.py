@@ -11,6 +11,7 @@ from vars import (
     public_cidrs,
     domain_name,
     vcenter_network,
+    vcenter_ip,
 )
 
 
@@ -41,11 +42,17 @@ os.system(
     "echo 'deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main' > /etc/apt/sources.list.d/google-cloud-sdk.list"
 )
 os.system(
+    "echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com jammy main' > /etc/apt/sources.list.d/hashicorp.list"
+)
+os.system(
     "curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -"
+)
+os.system(
+    "curl https://apt.releases.hashicorp.com/gpg | apt-key --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg add -"
 )
 os.system("DEBIAN_FRONTEND=noninteractive apt-get update -y")
 os.system(
-    'DEBIAN_FRONTEND=noninteractive apt-get install -o Dpkg::Options::="--force-confold" --force-yes -y dnsmasq vlan iptables-persistent conntrack python3-pip expect unzip python3-defusedxml google-cloud-sdk'
+    'DEBIAN_FRONTEND=noninteractive apt-get install -o Dpkg::Options::="--force-confold" --force-yes -y dnsmasq vlan iptables-persistent conntrack python3-pip expect unzip python3-defusedxml terraform=1.4.4-* packer=1.9*'
 )
 
 # Build single subnet map with all vlans, cidrs, etc...
@@ -90,23 +97,12 @@ interface_file = open("/etc/network/interfaces", "w")
 for line in lines:
     interface_file.write(line)
 
-# Open dnsmasq config for writing
-dnsmasq_conf = open("/etc/dnsmasq.d/dhcp.conf", "w")
+# # Open dnsmasq config for writing
+# dnsmasq_conf = open("/etc/dnsmasq.d/dhcp.conf", "w")
 
 # Loop though all subnets and setup Interfaces, DNSMasq, & IPTables
 for subnet in subnets:
-    if subnet["name"] == vcenter_network:
-        vcenter_ip = list(ipaddress.ip_network(subnet["cidr"]).hosts())[1].compressed
-    if subnet["routable"]:
-        # Find vCenter IP
-        if subnet["vsphere_service_type"] == "management":
-            management_gateway = list(ipaddress.ip_network(subnet["cidr"]).hosts())[
-                0
-            ].compressed
-            sed_cmd = (
-                "sed -i '1i nameserver " + management_gateway + "' /etc/resolv.conf"
-            )
-            os.system(sed_cmd)
+    if subnet["routable"] and subnet["nat"]:
         # Gather network facts about this subnet
         router_ip = list(ipaddress.ip_network(subnet["cidr"]).hosts())[0].compressed
         low_ip = list(ipaddress.ip_network(subnet["cidr"]).hosts())[1].compressed
@@ -119,41 +115,23 @@ for subnet in subnets:
         netmask = ipaddress.ip_network(subnet["cidr"]).netmask.compressed
 
         # Setup vLan interface for this subnet
-        interface_file.write("\nauto {}.{}\n".format(interface, subnet["vlan"]))
+        interface_file.write("\nauto {}:{}\n".format(interface, subnet["vlan"]))
         interface_file.write(
-            "iface {}.{} inet static\n".format(interface, subnet["vlan"])
+            "iface {}:{} inet static\n".format(interface, subnet["vlan"])
         )
-        interface_file.write("\taddress {}\n".format(router_ip))
+        interface_file.write("\taddress {}\n".format(low_ip))
         interface_file.write("\tnetmask {}\n".format(netmask))
         interface_file.write("\tvlan-raw-device {}\n".format(interface))
         interface_file.write("\tmtu 9000\n")
 
-        # Generate random name for the network
-        word = random.choice(words)
-        words.remove(word)
-
-        # Write dnsmasq dhcp scopes
-        dnsmasq_conf.write("dhcp-range=set:{},{},{},2h\n".format(word, low_ip, high_ip))
-        dnsmasq_conf.write(
-            "dhcp-option=tag:{},option:router,{}\n".format(word, router_ip)
-        )
-
-        # Create NAT rule for this network if the network is tagged as NAT
-        if subnet["nat"]:
-            os.system(
-                "iptables -t nat -A POSTROUTING -o bond0 -j MASQUERADE -s {}".format(
-                    subnet["cidr"]
-                )
-            )
-
 interface_file.close()
 
-# Reserve the vCenter IP
-dnsmasq_conf.write(
-    "\ndhcp-host=00:00:00:00:00:99, {} # vCenter IP\n".format(vcenter_ip)
-)
+# # Reserve the vCenter IP
+# dnsmasq_conf.write(
+#     "\ndhcp-host=00:00:00:00:00:99, {} # vCenter IP\n".format(vcenter_ip)
+# )
 
-dnsmasq_conf.close()
+# dnsmasq_conf.close()
 
 # DNS record for vCenter
 etc_hosts = open("/etc/hosts", "a+")
@@ -183,4 +161,7 @@ os.system("systemctl restart dnsmasq")
 os.system("iptables-save > /etc/iptables/rules.v4")
 
 # Install python modules
-os.system("pip3 install --upgrade pip pyvmomi packet-python")
+os.system("pip3 install --upgrade pip pyvmomi packet-python requests")
+
+os.system("pip3 install --upgrade git+https://github.com/vmware/vsphere-automation-sdk-python.git@v8.0.1.0")
+

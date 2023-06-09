@@ -38,30 +38,44 @@ resource "equinix_metal_vlan" "private_vlans" {
 }
 
 # Setup public IP block and routing table
-resource "equinix_metal_reserved_ip_block" "ip_blocks" {
-  count      = length(var.public_subnets)
+resource "equinix_metal_reserved_ip_block" "ip_block" {
   project_id = local.project_id
   facility   = var.facility == "" ? null : var.facility
   metro      = var.metro == "" ? null : var.metro
-  quantity   = element(var.public_subnets.*.ip_count, count.index)
+  quantity   = var.public_subnet.ip_count
 }
 
-resource "equinix_metal_vlan" "public_vlans" {
-  count       = length(var.public_subnets)
+resource "equinix_metal_vlan" "public_vlan" {
   facility    = var.facility == "" ? null : var.facility
   metro       = var.metro == "" ? null : var.metro
   project_id  = local.project_id
-  description = jsonencode(element(var.public_subnets.*.name, count.index))
+  description = var.public_subnet.name
 }
 
 # Setup gateway for public IPs to pass traffic
 resource "equinix_metal_gateway" "public_vlans" {
-  count             = length(var.public_subnets)
   project_id        = local.project_id
-  vlan_id           = element(equinix_metal_vlan.public_vlans.*.id, count.index)
-  ip_reservation_id = element(equinix_metal_reserved_ip_block.ip_blocks.*.id, count.index)
+  vlan_id           = equinix_metal_vlan.public_vlan.id
+  ip_reservation_id = equinix_metal_reserved_ip_block.ip_block.id
 }
 
-locals {
-  public_gateway_ip = ""
+# Generate random passwords for vCenter & SSO
+resource "random_password" "vcenter_password" {
+  length           = 16
+  min_upper        = 2
+  min_lower        = 2
+  min_numeric      = 2
+  min_special      = 2
+  override_special = "$!?@*"
+  special          = true
+}
+
+resource "random_password" "sso_password" {
+  length           = 16
+  min_upper        = 2
+  min_lower        = 2
+  min_numeric      = 2
+  min_special      = 2
+  override_special = "$!?@*"
+  special          = true
 }
