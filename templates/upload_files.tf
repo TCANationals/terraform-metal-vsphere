@@ -19,7 +19,7 @@ locals {
   vcenter_cluster_name    = "Cluster"
   datastore_name          = "vsanDatastore"
   directory_name          = "uploads"
-  files_to_uploads        = [
+  files_to_uploads = [
     "en-us_sql_server_2019_enterprise_x64_dvd_46f0ba38.iso",
     "en-us_windows_10_enterprise_ltsc_2021_x64_dvd_d289cf96.iso",
     "SW_DVD9_Win_Server_STD_CORE_2022_64Bit_English_DC_STD_MLF_X22-74290.iso",
@@ -42,8 +42,8 @@ data "vsphere_datastore" "datastore" {
 resource "vsphere_file" "file_upload" {
   for_each = toset(local.files_to_uploads)
 
-  datacenter         = data.vsphere_datacenter.datacenter.name
-  datastore          = data.vsphere_datastore.datastore.name
+  datacenter = data.vsphere_datacenter.datacenter.name
+  datastore  = data.vsphere_datastore.datastore.name
 
   source_file        = "${path.module}/${each.key}"
   destination_file   = "/uploads/${each.key}"

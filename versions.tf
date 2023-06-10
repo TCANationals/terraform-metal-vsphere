@@ -9,9 +9,6 @@ terraform {
     random = {
       source = "hashicorp/random"
     }
-    template = {
-      source = "hashicorp/template"
-    }
     tls = {
       source = "hashicorp/tls"
     }
