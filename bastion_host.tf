@@ -36,6 +36,7 @@ resource "time_sleep" "vlan_sleep" {
 
 locals {
   primary_public_subnet_cidr = equinix_metal_reserved_ip_block.ip_block.cidr_notation
+  vcenter_ip                 = cidrhost(local.primary_public_subnet_cidr, 2)
 }
 
 data "template_file" "download_vcenter" {
@@ -100,7 +101,7 @@ data "template_file" "vars_file" {
     metal_token            = var.auth_token,
     primary_public_vlan_id = equinix_metal_vlan.public_vlan.vxlan,
     primary_public_gateway = cidrhost(local.primary_public_subnet_cidr, 1),
-    vcenter_ip             = cidrhost(local.primary_public_subnet_cidr, 2),
+    vcenter_ip             = local.vcenter_ip,
     opnsense_ip            = cidrhost(local.primary_public_subnet_cidr, 3),
     uag_ip                 = cidrhost(local.primary_public_subnet_cidr, 4),
   }

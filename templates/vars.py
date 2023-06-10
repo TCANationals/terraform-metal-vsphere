@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 import json
 
+files_to_upload = []
+
 # Vars from Terraform in """ so single quotes from Terraform vars don't escape
 private_subnets = json.loads("""${private_subnets}""")
 private_vlans = json.loads("""${private_vlans}""")

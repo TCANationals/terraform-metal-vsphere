@@ -1,7 +1,8 @@
+import os
 import sys
 import subprocess
 from time import sleep
-from pyVmomi import vim
+from pyVmomi import pbm, vim, VmomiSupport, SoapStubAdapter
 from pyVim import connect
 import vsanapiutils
 import requests
@@ -119,6 +120,59 @@ def create_port_group(host, pg_name, switch, vlan_id):
     print("Successfully created PortGroup ", pg_name)
 
 
+def create_distributed_port_group(si, pg_name, switch, vlan_id):
+    for pg in switch.portgroup:
+        if pg.name == pg_name:
+            print('PortGroup already exists, will not recreate', pg_name)
+            return
+
+    port_group_spec = vim.dvs.DistributedVirtualPortgroup.ConfigSpec()
+    port_group_spec.name = pg_name
+    port_group_spec.type = vim.dvs.DistributedVirtualPortgroup.PortgroupType.ephemeral
+
+    port_group_spec.defaultPortConfig = vim.dvs.VmwareDistributedVirtualSwitch.VmwarePortConfigPolicy()
+
+    port_group_spec.defaultPortConfig.securityPolicy = vim.dvs.VmwareDistributedVirtualSwitch.SecurityPolicy()
+    port_group_spec.defaultPortConfig.securityPolicy.macChanges = vim.BoolPolicy(value=False)
+    port_group_spec.defaultPortConfig.securityPolicy.inherited = False
+    port_group_spec.defaultPortConfig.securityPolicy.allowPromiscuous = vim.BoolPolicy(value=True)
+    port_group_spec.defaultPortConfig.securityPolicy.forgedTransmits = vim.BoolPolicy(value=True)  
+
+    port_group_spec.defaultPortConfig.vlan = vim.dvs.VmwareDistributedVirtualSwitch.VlanIdSpec()
+    port_group_spec.defaultPortConfig.vlan.vlanId = vlan_id
+    port_group_spec.defaultPortConfig.vlan.inherited = False
+
+    port_group_spec.defaultPortConfig.uplinkTeamingPolicy = vim.dvs.VmwareDistributedVirtualSwitch.UplinkPortTeamingPolicy()
+    port_group_spec.defaultPortConfig.uplinkTeamingPolicy.uplinkPortOrder = vim.dvs.VmwareDistributedVirtualSwitch.UplinkPortOrderPolicy()
+    port_group_spec.defaultPortConfig.uplinkTeamingPolicy.uplinkPortOrder.activeUplinkPort = ['lag0'] # from deploy_vcva script
+    port_group_spec.defaultPortConfig.uplinkTeamingPolicy.uplinkPortOrder.standbyUplinkPort = []
+
+    task = switch.AddDVPortgroup_Task([port_group_spec])
+    wait_for_task(task, si)
+
+    print("Successfully created PortGroup ", pg_name)
+
+
+def join_esx_host_to_vc(si, host, cluster):
+    print(
+        "Joining host {} to the cluster".format(host["ip"])
+    )
+
+    for joinedHost in cluster.host:
+        if joinedHost.name == host["ip"]:
+            print("Host already joined, skipping...")
+            return
+
+    host_connect_spec = vim.host.ConnectSpec()
+    host_connect_spec.hostName = host["ip"]
+    host_connect_spec.userName = "root"
+    host_connect_spec.password = host["password"]
+    host_connect_spec.force = True
+    host_connect_spec.sslThumbprint = get_ssl_thumbprint(host["ip"])
+    task = cluster.AddHost_Task(spec=host_connect_spec, asConnected=True)
+    wait_for_task(task, si)
+    return
+
 def getEsxStorageAssignments(host, user, password):
     host, si = connectToApi(host, user, password)
     cluster = getHostInstance(si)
@@ -225,3 +279,129 @@ def get_ssl_thumbprint(host_ip):
     out = p3.stdout.read()
     ssl_thumbprint = out.split(b"=")[-1].strip()
     return ssl_thumbprint.decode("utf-8")
+
+
+def get_obj(content, vimtype, name):
+    """
+     Get the vsphere object associated with a given text name
+    """    
+    obj = None
+    container = content.viewManager.CreateContainerView(content.rootFolder, vimtype, True)
+    for c in container.view:
+        if c.name == name:
+            obj = c
+            break
+    return obj
+
+
+def wait_for_task(task, actionName='job', hideResult=False):
+    """
+    Waits and provides updates on a vSphere task
+    """
+    
+    while task.info.state == vim.TaskInfo.State.running:
+        sleep(2)
+    
+    if task.info.state == vim.TaskInfo.State.success:
+        if task.info.result is not None and not hideResult:
+            out = '%s completed successfully, result: %s' % (actionName, task.info.result)
+            print(out)
+        else:
+            out = '%s completed successfully.' % actionName
+            print(out)
+    else:
+        out = '%s did not complete successfully: %s' % (actionName, task.info.error)
+        print(out)
+        print(task.info.error)
+        return False
+    
+    return task.info.result
+
+
+def get_all_storage_profiles(profile_manager):
+    """Search vmware storage policy profile by name
+    :param profile_manager: A VMware Storage Policy Service manager object
+    :type profileManager: pbm.profile.ProfileManager
+    :param name: A VMware Storage Policy profile name
+    :type name: str
+    :returns: A VMware Storage Policy profile
+    :rtype: pbm.profile.Profile
+    """
+    profile_ids = profile_manager.PbmQueryProfile(
+        resourceType=pbm.profile.ResourceType(resourceType="STORAGE"),
+        profileCategory="REQUIREMENT"
+    )
+
+    if len(profile_ids) > 0:
+        storage_profiles = profile_manager.PbmRetrieveContent(
+            profileIds=profile_ids)
+
+    return storage_profiles
+
+def pbm_connect(stub_adapter, disable_ssl_verification=True):
+    """Connect to the VMware Storage Policy Server
+    :param stub_adapter: The ServiceInstance stub adapter
+    :type stub_adapter: SoapStubAdapter
+    :param disable_ssl_verification: A flag used to skip ssl certificate
+        verification (default is False)
+    :type disable_ssl_verification: bool
+    :returns: A VMware Storage Policy Service content object
+    :rtype: ServiceContent
+    """
+
+    if disable_ssl_verification:
+        import ssl
+        if hasattr(ssl, '_create_unverified_context'):
+            ssl_context = ssl._create_unverified_context()
+        else:
+            ssl_context = None
+    else:
+        ssl_context = None
+
+    VmomiSupport.GetRequestContext()["vcSessionCookie"] = \
+        stub_adapter.cookie.split('"')[1]
+    hostname = stub_adapter.host.split(":")[0]
+    pbm_stub = SoapStubAdapter(
+        host=hostname,
+        version="pbm.version.version1",
+        path="/pbm/sdk",
+        poolSize=0,
+        sslContext=ssl_context)
+    pbm_si = pbm.ServiceInstance("ServiceInstance", pbm_stub)
+    pbm_content = pbm_si.RetrieveContent()
+    return pbm_content
+
+
+def upload_file_to_datastore(filename, datastore, datacenter, host, si):
+    resource = f"/folder/[vsanDatastore] uploads/{filename}"
+    params = {"dsName": datastore.info.name, "dcPath": datacenter.name}
+    http_url = "https://" + host + ":443" + resource
+
+    # Get the cookie built from the current session
+    client_cookie = si._stub.cookie
+    # Break apart the cookie into it's component parts - This is more than
+    # is needed, but a good example of how to break apart the cookie
+    # anyways. The verbosity makes it clear what is happening.
+    cookie_name = client_cookie.split("=", 1)[0]
+    cookie_value = client_cookie.split("=", 1)[1].split(";", 1)[0]
+    cookie_path = client_cookie.split("=", 1)[1].split(";", 1)[1].split(
+        ";", 1)[0].lstrip()
+    cookie_text = " " + cookie_value + "; $" + cookie_path
+    # Make a cookie
+    cookie = dict()
+    cookie[cookie_name] = cookie_text
+
+    # Get the request headers set up
+    headers = {'Content-Type': 'application/octet-stream'}
+
+    # Get the file to upload ready, extra protection by using with against
+    # leaving open threads
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), filename), "rb") as file_data:
+        # Connect and upload the file
+        requests.put(http_url,
+                        params=params,
+                        data=file_data,
+                        headers=headers,
+                        cookies=cookie,
+                        verify=False)
+    print("uploaded the file")

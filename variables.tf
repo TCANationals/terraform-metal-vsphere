@@ -165,7 +165,7 @@ variable "vcenter_datacenter_name" {
 variable "vcenter_cluster_name" {
   description = "This will be the name of the vCenter Cluster object."
   type        = string
-  default     = "Metal-1"
+  default     = "Cluster"
 }
 
 variable "vcenter_domain" {
@@ -240,7 +240,7 @@ variable "vcva_deployment_option" {
   https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vcenter.install.doc/GUID-457EAE1F-B08A-4E64-8506-8A3FA84A0446.html#GUID-457EAE1F-B08A-4E64-8506-8A3FA84A0446__row_5D65E7455996456CBDCB3EF9A7DCDC62__entry__1
   EOF
   type        = string
-  default     = "small"
+  default     = "tiny"
 }
 
 variable "update_esxi" {

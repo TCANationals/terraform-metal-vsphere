@@ -47,10 +47,6 @@ resource "null_resource" "deploy_vcva" {
     null_resource.run_pre_reqs,
   ]
 
-  triggers = {
-    build_number = "${timestamp()}"
-  }
-
   connection {
     type        = "ssh"
     user        = local.ssh_user
@@ -69,7 +65,6 @@ resource "null_resource" "deploy_vcva" {
 }
 
 # Setup distributed network portgroups on vsphere
-
 resource "null_resource" "setup_esx_hosts" {
   depends_on = [
     null_resource.deploy_vcva,
@@ -87,8 +82,17 @@ resource "null_resource" "setup_esx_hosts" {
   }
 
   provisioner "file" {
-    content     = file("${path.module}/templates/vsan_claim.py")
-    destination = "bootstrap/vsan_claim.py"
+    content = templatefile("${path.module}/templates/remote_terraform.tfvars", {
+      vcenter_password = random_password.sso_password.result,
+      vcenter_ip       = local.vcenter_ip,
+    })
+
+    destination = "bootstrap/terraform.tfvars"
+  }
+
+  provisioner "file" {
+    content     = file("${path.module}/templates/upload_files.tf")
+    destination = "bootstrap/upload_files.tf"
   }
 
   provisioner "file" {
@@ -96,7 +100,11 @@ resource "null_resource" "setup_esx_hosts" {
     destination = "bootstrap/join_esx_hosts.py"
   }
 
-  #   provisioner "remote-exec" {
-  #     inline = ["python3 $HOME/bootstrap/deploy_vcva.py"]
-  #   }
+  provisioner "remote-exec" {
+    inline = ["cd $HOME/bootstrap && terraform init && terraform apply -auto-approve"]
+  }
+
+  provisioner "remote-exec" {
+    inline = ["python3 $HOME/bootstrap/join_esx_hosts.py"]
+  }
 }

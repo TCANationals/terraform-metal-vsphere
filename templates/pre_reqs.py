@@ -52,7 +52,7 @@ os.system(
 )
 os.system("DEBIAN_FRONTEND=noninteractive apt-get update -y")
 os.system(
-    'DEBIAN_FRONTEND=noninteractive apt-get install -o Dpkg::Options::="--force-confold" --force-yes -y dnsmasq vlan iptables-persistent conntrack python3-pip expect unzip python3-defusedxml terraform=1.4.4-* packer=1.9*'
+    'DEBIAN_FRONTEND=noninteractive apt-get install -o Dpkg::Options::="--force-confold" --force-yes -y git dnsmasq vlan iptables-persistent conntrack python3-pip expect unzip python3-defusedxml terraform=1.4.4-* packer=1.9*'
 )
 
 # Build single subnet map with all vlans, cidrs, etc...
@@ -163,5 +163,5 @@ os.system("iptables-save > /etc/iptables/rules.v4")
 # Install python modules
 os.system("pip3 install --upgrade pip pyvmomi packet-python requests")
 
-os.system("pip3 install --upgrade git+https://github.com/vmware/vsphere-automation-sdk-python.git@v8.0.1.0")
+#os.system("pip3 install --upgrade git+https://github.com/vmware/vsphere-automation-sdk-python.git@v8.0.1.0")
 

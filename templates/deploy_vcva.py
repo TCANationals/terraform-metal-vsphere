@@ -2,8 +2,7 @@ import os
 import sys
 import json
 from time import sleep
-from pyVmomi import vim
-from pyVim import connect
+from pyVmomi import vim, pbm
 from vars import (
     private_subnets,
     public_subnets,
@@ -19,13 +18,18 @@ from vars import (
     domain_name,
     vcenter_ip,
     primary_public_gateway,
+    files_to_upload,
 )
 from functions import (
     get_active_switch,
     create_port_group,
+    wait_for_task,
     get_ssl_thumbprint,
     connectToApi,
     getEsxStorageAssignments,
+    pbm_connect,
+    get_all_storage_profiles,
+    upload_file_to_datastore,
 )
 
 subnets = private_subnets
@@ -95,49 +99,129 @@ os.system(
 )
 
 # Connect to vCenter
-si = None
-for i in range(1, 30):
-    try:
-        si = connect.SmartConnect(
-            host=vcenter_ip, user=vcenter_username, pwd=sso_password, port=443, disableSslCertValidation=True
-        )
-        break
-    except Exception:
-        sleep(10)
-if si is None:
-    print("Couldn't connect to vCenter!!!")
-    sys.exit(1)
+cluster, si = connectToApi(vcenter_ip, vcenter_username, sso_password)
 
 # Create Datacenter in the root folder
 folder = si.content.rootFolder
 #dc = folder.CreateDatacenter(name=dc_name)
 dc = folder.childEntity[0] # data center created from vsan setup
 
-# Create cluster config
-cluster_config = vim.cluster.ConfigSpecEx()
+# Create DVS config
+network_folder = dc.networkFolder
+pnic_specs = []
+dvs_host_configs = []
+uplink_port_names = ["dvUplink0", "dvUplink1"] # unused, all hosts will use LAG
+dvs_create_spec = vim.DistributedVirtualSwitch.CreateSpec()
 
-# Create DRS config
-drs_config = vim.cluster.DrsConfigInfo()
-drs_config.enabled = True
-cluster_config.drsConfig = drs_config
+dvs_config_spec = vim.dvs.VmwareDistributedVirtualSwitch.ConfigSpec()
+dvs_config_spec.name = 'metalSwitch0'
+dvs_config_spec.uplinkPortPolicy = vim.DistributedVirtualSwitch.NameArrayUplinkPortPolicy()
 
-# if len(esx) > 2:
-#     # Create vSan config
-#     vsan_config = vim.vsan.cluster.ConfigInfo()
-#     vsan_config.enabled = True
-#     vsan_config.defaultConfig = vim.vsan.cluster.ConfigInfo.HostDefaultInfo(
-#         autoClaimStorage=True
-#     )
-#     cluster_config.vsanConfig = vsan_config
+dvs_config_spec.maxMtu = 9000
 
-# # Create HA config
-# if len(esx) > 1:
-#     ha_config = vim.cluster.DasConfigInfo()
-#     ha_config.enabled = True
-#     ha_config.hostMonitoring = vim.cluster.DasConfigInfo.ServiceState.enabled
-#     ha_config.failoverLevel = 1
-#     cluster_config.dasConfig = ha_config
+dvs_config_spec.uplinkPortPolicy.uplinkPortName = uplink_port_names
 
-# Create the cluster
-# host_folder = dc.hostFolder
-# cluster = host_folder.CreateClusterEx(name=vcenter_cluster_name, spec=cluster_config)
+# Setup LACP for link discovery per Equinix docs
+link_discov_config = vim.host.LinkDiscoveryProtocolConfig()
+link_discov_config.protocol = vim.host.LinkDiscoveryProtocolConfig.ProtocolType.lldp
+link_discov_config.operation = vim.host.LinkDiscoveryProtocolConfig.OperationType.listen
+dvs_config_spec.linkDiscoveryProtocolConfig = link_discov_config
+
+dvs_create_spec.configSpec = dvs_config_spec
+dvs_create_spec.productInfo = vim.dvs.ProductSpec(version='7.0.3')
+
+task = network_folder.CreateDVS_Task(dvs_create_spec)
+wait_for_task(task, si)
+dvs = task.info.result # created switch
+
+# Setup link aggregation group once the switch is created
+lacp_config = vim.dvs.VmwareDistributedVirtualSwitch.LacpGroupConfig()
+lacp_config.name = 'lag0'
+lacp_config.mode = vim.dvs.VmwareDistributedVirtualSwitch.UplinkLacpMode.active
+lacp_config.uplinkNum = 4 # max number of NICs on a server
+lacp_config.loadbalanceAlgorithm = vim.dvs.VmwareDistributedVirtualSwitch.LacpLoadBalanceAlgorithm.srcDestIpTcpUdpPortVlan
+
+lacp_create_spec = vim.dvs.VmwareDistributedVirtualSwitch.LacpGroupSpec()
+lacp_create_spec.lacpGroupConfig = lacp_config
+lacp_create_spec.operation = vim.ConfigSpecOperation.add
+
+lacp_task = dvs.UpdateDVSLacpGroupConfig_Task([lacp_create_spec])
+wait_for_task(lacp_task, si)
+
+# Disable all vSAN replica requirements (manually turn these on later!)
+pbm_content = pbm_connect(si._stub)
+pm = pbm_content.profileManager
+
+all_storage_profiles = get_all_storage_profiles(pm)
+
+# Find storage profiles with constraints so we can remove them
+constrained_storage_profiles = []
+denied_profile_list = [
+    'Host-local PMem Default Storage Policy'.lower(),
+    'vSAN ESA Default Policy - RAID5'.lower(),
+    'vSAN ESA Default Policy - RAID6'.lower(),
+]
+for storage_profile in all_storage_profiles:
+    if storage_profile.constraints and type(storage_profile.constraints) == pbm.profile.SubProfileCapabilityConstraints:
+        if not storage_profile.isDefault and storage_profile.name[0:25].lower() != 'Management Storage Policy'.lower():
+            if storage_profile.name.lower() not in denied_profile_list:
+                constrained_storage_profiles.append(storage_profile)
+
+for profile in constrained_storage_profiles:
+    for subprofile in profile.constraints.subProfiles:
+        pm.PbmUpdate(
+            profileId=profile.profileId,
+            updateSpec=pbm.profile.CapabilityBasedProfileUpdateSpec(
+                description=None,
+                constraints=pbm.profile.SubProfileCapabilityConstraints(
+                    subProfiles=[
+                        pbm.profile.SubProfileCapabilityConstraints.SubProfile(
+                            name=subprofile.name,
+                            capability=[
+                                pbm.capability.CapabilityInstance(
+                                    id=pbm.capability.CapabilityMetadata.UniqueId(
+                                        namespace='VSAN',
+                                        id='hostFailuresToTolerate'
+                                    ),
+                                    constraint=[
+                                        pbm.capability.ConstraintInstance(
+                                            propertyInstance=[
+                                                pbm.capability.PropertyInstance(
+                                                    id='hostFailuresToTolerate',
+                                                    value=0
+                                                )
+                                            ]
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            )
+        )
+
+# # Upload local files to vCenter
+# datastore = None
+# datastores_object_view = si.content.viewManager.CreateContainerView(
+#     dc,
+#     [vim.Datastore],
+#     True)
+
+# for ds_obj in datastores_object_view.view:
+#     if ds_obj.info.name == 'vsanDatastore':
+#         datastore = ds_obj
+
+# if not datastore:
+#     print("Could not find the datastore specified")
+#     sys.exit(1)
+
+# # Clean up the views now that we have what we need
+# datastores_object_view.Destroy()
+
+# # Create directory for uploaded files
+# fileManager = si.content.fileManager
+# fileManager.MakeDirectory('[vsanDatastore] uploads', createParentDirectories=True, datacenter=dc)
+
+# for file in files_to_upload:
+#     upload_file_to_datastore(file, datastore, dc, esx[0]["ip"], si)
