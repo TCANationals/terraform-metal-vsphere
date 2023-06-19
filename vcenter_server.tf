@@ -82,7 +82,7 @@ resource "null_resource" "setup_esx_hosts" {
   }
 
   provisioner "file" {
-    content = templatefile("${path.module}/templates/remote_terraform.tfvars", {
+    content = templatefile("${path.module}/templates/remote_terraform.tfvars.tpl", {
       vcenter_password = random_password.sso_password.result,
       vcenter_ip       = local.vcenter_ip,
     })
@@ -101,7 +101,7 @@ resource "null_resource" "setup_esx_hosts" {
   }
 
   provisioner "remote-exec" {
-    inline = ["cd $HOME/bootstrap && terraform init && terraform apply -auto-approve"]
+    inline = ["cd $HOME/bootstrap && terraform init && terraform apply -auto-approve -parallelism=1"]
   }
 
   provisioner "remote-exec" {

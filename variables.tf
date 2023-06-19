@@ -61,7 +61,7 @@ variable "private_subnets" {
       "nat" : false,
       "vsphere_service_type" : "vsan",
       "routable" : false,
-      "cidr" : "172.16.2.0/24"
+      "cidr" : "10.0.0.101/24"
     }
   ]
 }

@@ -37,6 +37,9 @@ resource "time_sleep" "vlan_sleep" {
 locals {
   primary_public_subnet_cidr = equinix_metal_reserved_ip_block.ip_block.cidr_notation
   vcenter_ip                 = cidrhost(local.primary_public_subnet_cidr, 2)
+  primary_public_gateway_ip  = cidrhost(local.primary_public_subnet_cidr, 1)
+  opnsense_ip                = cidrhost(local.primary_public_subnet_cidr, 3)
+  uag_ip                     = cidrhost(local.primary_public_subnet_cidr, 4)
 }
 
 resource "null_resource" "download_pre_reqs" {
@@ -109,10 +112,10 @@ resource "null_resource" "setup_vars" {
       dc_name                = var.vcenter_datacenter_name,
       metal_token            = var.auth_token,
       primary_public_vlan_id = equinix_metal_vlan.public_vlan.vxlan,
-      primary_public_gateway = cidrhost(local.primary_public_subnet_cidr, 1),
+      primary_public_gateway = local.primary_public_gateway_ip,
       vcenter_ip             = local.vcenter_ip,
-      opnsense_ip            = cidrhost(local.primary_public_subnet_cidr, 3),
-      uag_ip                 = cidrhost(local.primary_public_subnet_cidr, 4),
+      opnsense_ip            = local.opnsense_ip,
+      uag_ip                 = local.uag_ip,
     })
     destination = "bootstrap/vars.py"
   }

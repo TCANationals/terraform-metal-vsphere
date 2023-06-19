@@ -25,6 +25,11 @@ output "vcenter_root_password" {
 #   description = "The path of to the private SSH key created for this deployment"
 # }
 
+output "gateway_ip" {
+  value       = local.primary_public_gateway_ip
+  description = "The IP address of vCenter"
+}
+
 output "vcenter_ip" {
   value       = local.vcenter_ip
   description = "The IP address of vCenter"
@@ -32,5 +37,15 @@ output "vcenter_ip" {
 
 output "bastion_ip" {
   value       = equinix_metal_device.bastion.access_public_ipv4
+  description = "The IP address of the Bastion host"
+}
+
+output "opnsense_ip" {
+  value       = local.opnsense_ip
+  description = "The IP address of the Bastion host"
+}
+
+output "uag_ip" {
+  value       = local.uag_ip
   description = "The IP address of the Bastion host"
 }

@@ -21,7 +21,7 @@ resource "equinix_metal_device" "esxi_hosts" {
 # Have to sleep after ESXi hosts are provisioned, since they reboot the host at end of provisioning
 resource "time_sleep" "reboot_post_creation" {
   depends_on      = [equinix_metal_device.esxi_hosts]
-  create_duration = "300s"
+  create_duration = "400s"
 }
 
 # Run the ESXi update script file in each server.
@@ -63,7 +63,7 @@ resource "time_sleep" "reboot_post_upgrade" {
   depends_on = [null_resource.upgrade_nodes]
   count      = var.update_esxi ? 1 : 0
 
-  create_duration = "300s"
+  create_duration = "400s" # m3.large can take awhile to reboot
 }
 
 

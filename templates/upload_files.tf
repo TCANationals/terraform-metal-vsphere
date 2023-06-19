@@ -25,8 +25,11 @@ locals {
     "SW_DVD9_Win_Server_STD_CORE_2022_64Bit_English_DC_STD_MLF_X22-74290.iso",
     "FreeBSD-13.2-RELEASE-amd64-disc1.iso",
     "ubuntu-22.04.1-live-server-amd64.iso",
+    "ubuntu-22.04.2-desktop-amd64.iso",
     "VMware-tools-windows-12.2.0-21223074.iso",
     "euc-unified-access-gateway-23.03.0.0-21401666_OVF10.ova",
+    "OPNsense-23.1-OpenSSL-dvd-amd64.iso",
+    "ExchangeServer2019-x64-CU13.iso",
   ]
 }
 

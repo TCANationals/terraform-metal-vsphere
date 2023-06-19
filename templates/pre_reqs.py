@@ -115,9 +115,9 @@ for subnet in subnets:
         netmask = ipaddress.ip_network(subnet["cidr"]).netmask.compressed
 
         # Setup vLan interface for this subnet
-        interface_file.write("\nauto {}:{}\n".format(interface, subnet["vlan"]))
+        interface_file.write("\nauto {}.{}\n".format(interface, subnet["vlan"]))
         interface_file.write(
-            "iface {}:{} inet static\n".format(interface, subnet["vlan"])
+            "iface {}.{} inet static\n".format(interface, subnet["vlan"])
         )
         interface_file.write("\taddress {}\n".format(low_ip))
         interface_file.write("\tnetmask {}\n".format(netmask))
