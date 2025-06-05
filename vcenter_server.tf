@@ -30,7 +30,8 @@ resource "null_resource" "copy_vcva_template" {
     content = templatefile("${path.module}/templates/vcva_template.json", {
       vcenter_password       = random_password.vcenter_password.result,
       sso_password           = random_password.sso_password.result,
-      first_esx_pass         = module.esxi_hosts.0.root_password,
+      #first_esx_pass         = module.esxi_hosts.0.root_password,
+      first_esx_pass         = random_password.sso_password.result,
       domain_name            = var.domain_name,
       vcenter_network        = var.vcenter_portgroup_name,
       vcenter_domain         = var.vcenter_domain,
@@ -42,9 +43,16 @@ resource "null_resource" "copy_vcva_template" {
   }
 }
 
+resource "time_sleep" "deploy_vcva" {
+  depends_on = [null_resource.run_pre_reqs]
+
+  create_duration = "1s"
+}
+
 resource "null_resource" "deploy_vcva" {
   depends_on = [
-    null_resource.run_pre_reqs,
+    time_sleep.deploy_vcva,
+    null_resource.copy_vcva_template,
   ]
 
   connection {

@@ -80,7 +80,7 @@ variable "public_subnet" {
     "nat" : false,
     "vsphere_service_type" : null,
     "routable" : true,
-    "ip_count" : 8
+    "ip_count" : 16
   }
 }
 
