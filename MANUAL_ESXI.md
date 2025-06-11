@@ -10,7 +10,7 @@ Since Equinix metal has removed automated install support for ESXi, it must be m
 
 	http://s3.amazonaws.com/files.tcanationals.com/esxi/ESXi-8.0.3-24674464
 
-4) Follow ESXi install prompts. Once system is installed, boot into Rescue OS on Equinix console.
+4) Follow ESXi install prompts. Once system is installed, disable PXE & boot into Rescue OS on Equinix console.
 
 5) Run the following command to mount the ESXi boot drive:
 
